@@ -18,7 +18,7 @@ class FFmpeg:
         self.addmusic = addmusic
         self.addvdohead = addvdohead
         self.addvdotail = addvdotail
-        self.vdo_time, self.vdo_width, self.vdo_height = self.get_attr()
+        self.vdo_time, self.vdo_width, self.vdo_height, self.attr_dict = self.get_attr()
         self.editvdo_path = os.path.dirname(editvdo)
         self.editvdo_name = os.path.basename(editvdo)
 
@@ -27,31 +27,32 @@ class FFmpeg:
         获取视频属性参数
         :return:
         """
-        strcmd = r'ffmpeg -print_format json -show_streams -i "{}"'.format(
-                self.editvdo)
-        result = subprocess.run(args=strcmd, stdout=subprocess.PIPE, shell=True)
-        vdo_time = int(re.findall('"duration": "\d{0,5}', str(
-            result))[0][13:])  # 获取视频长度
-        vdo_width = int(
-            re.findall('"width": \d{0,5}', str(result))[0][9:])  # 获取视频宽度
-        vdo_height = int(
-            re.findall('"height": \d{0,5}', str(result))[0][10:])  # 获取视频高度
-        attr = (vdo_time, vdo_width, vdo_height)
+        strcmd = r'ffprobe -print_format json -show_streams -i "{}"'.format(self.editvdo)
+        status, output = subprocess.getstatusoutput(strcmd)
+        agrs = eval(re.search('{.*}', output, re.S).group().replace("\n", "").replace(" ", ''))
+        streams = agrs.get('streams', [])
+        agrs_dict = dict()
+        [agrs_dict.update(x) for x in streams]
+        vdo_time = agrs_dict.get('duration')
+        vdo_width = agrs_dict.get('width')
+        vdo_height = agrs_dict.get('height')
+        attr = (vdo_time, vdo_width, vdo_height, agrs_dict)
         return attr
 
-    def edit_head(self, second, deposit=None):
+    def edit_head(self, start_time, end_time, deposit=None):
         """
-        去除头部视频
+        截取指定长度视频
         :param second: 去除开始的多少秒
         :param deposit: 另存为文件
         :return: True/Flase
         """
         if None == deposit:
             deposit = self.editvdo_path+'/'+'edit_head'+self.editvdo_name
-        strcmd = 'ffmpeg -i "{}" -ss  10 -t {}  -codec copy "{}"'.format(
-            self.editvdo, second, deposit)
-        result = subprocess.run(args=strcmd, stdout=subprocess.PIPE,
-                                shell=True)
+        start = time.strftime('%H:%M:%S', time.gmtime(start_time))
+        end = time.strftime('%H:%M:%S', time.gmtime(end_time))
+        strcmd = 'ffmpeg  -i "{}" -vcodec copy -acodec copy -ss {} -to {} "{}" -y'.format(
+            self.editvdo, start, end, deposit)
+        result = subprocess.run(args=strcmd, stdout=subprocess.PIPE, shell=True)
         if os.path.exists(deposit):
             os.remove(self.editvdo)
             os.rename(deposit, self.editvdo)
@@ -153,6 +154,6 @@ class FFmpeg:
 
 
 
-test = FFmpeg(r"C:\Users\billl\1.mp4")
+test = FFmpeg(r"D:\vdio\4.mp4")
 pass
 
